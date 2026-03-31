@@ -18,6 +18,7 @@ jobs:
         id: config
         run: |
           CONFIG_FILE=".github/smoke_test.json"
+          cat $CONFIG_FILE
           if [ ! -f "$CONFIG_FILE" ] || [ "$(jq -r '.enabled // false' "$CONFIG_FILE")" != "true" ]; then
             echo "enabled=false" >> $GITHUB_OUTPUT
             echo "Smoke test disabled or config not found."
