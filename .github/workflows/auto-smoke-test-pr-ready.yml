@@ -5,7 +5,7 @@ on:
 
 jobs:
   auto-ready-pr:
-    runs-on: arc-runner-ai-rec-default-nelson
+    runs-on: ubuntu-latest
     permissions:
       pull-requests: write
       issues: write
