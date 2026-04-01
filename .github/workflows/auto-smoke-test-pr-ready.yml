@@ -155,13 +155,13 @@ jobs:
           SMOKE_CONFIG_ERROR: ${{ steps.config.outputs.config_error }}
           SMOKE_RESPONSE_SAMPLE: ${{ steps.smoke_test.outputs.api_sample }}
         run: |
-          IS_FAILED="false"
-          if [ "$SMOKE_ENABLED" = "true" ]; then
-            if [ -n "$SMOKE_CONFIG_ERROR" ] || [ "$SMOKE_HTTP_CODE" -lt 200 ] || [ "$SMOKE_HTTP_CODE" -ge 400 ]; then
-              IS_FAILED="true"
-            fi
+          IS_SUCCESS="false"
+          if [ "$SMOKE_ENABLED" != "true" ]; then
+            IS_SUCCESS="true"
+          elif [ -z "$SMOKE_CONFIG_ERROR" ] && [ "$SMOKE_HTTP_CODE" -ge 200 ] && [ "$SMOKE_HTTP_CODE" -lt 400 ]; then
+            IS_SUCCESS="true"
           fi
-          echo "smoke_failed=$IS_FAILED" >> "$GITHUB_OUTPUT"
+          echo "smoke_success=$IS_SUCCESS" >> "$GITHUB_OUTPUT"
 
           EOF_MARKER="EOF_$(date +%s)"
           { 
@@ -169,10 +169,10 @@ jobs:
             if [ "$SMOKE_ENABLED" != "true" ]; then
               echo "### ⚪ Smoke Test: SKIPPED"
               echo "Smoke test is disabled in \`.github/smoke_test.json\`."
-            elif [ "$IS_FAILED" = "true" ]; then
-              echo "### 🔴 Smoke Test: FAILED"
-            else
+            elif [ "$IS_SUCCESS" = "true" ]; then
               echo "### 🟢 Smoke Test: PASSED"
+            else
+              echo "### 🔴 Smoke Test: FAILED"
             fi
             
             echo ""
@@ -226,6 +226,6 @@ jobs:
         with:
           token: ${{ github.token }}
           sha: ${{ github.event.sha || github.sha }}
-          status: ${{steps.prepare_body.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
+          status: ${{ steps.prepare_body.outputs.smoke_success == 'true' && 'success' || 'failure' }}
           context: 'Auto Smoke Test'
-          description: ${{steps.prepare_body.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
+          description: ${{ steps.prepare_body.outputs.smoke_success == 'true' && 'Smoke Test passed' || 'Smoke Test failed or interrupted' }}
