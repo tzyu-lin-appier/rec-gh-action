@@ -192,4 +192,4 @@ jobs:
           sha: ${{ github.event.sha || github.sha }}
           status: ${{ steps.process_pr.outputs.smoke_failed == 'true' && 'failure' || 'success' }}
           context: 'Auto Smoke Test'
-          description: ${{ steps.process_pr.outputs.smoke_failed == 'true' && 'Smoke Test failed.' || 'Smoke Test passed!' }}
+          description: ${{ steps.process_pr.outputs.smoke_failed == 'true' && 'Smoke Test failed' || 'Smoke Test passed' }}
