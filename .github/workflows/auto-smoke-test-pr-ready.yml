@@ -6,23 +6,24 @@ on:
 jobs:
   auto-ready-pr:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       statuses: write
       pull-requests: write
       issues: write
-      contents: write
+      contents: read
     env:
       ALLOWED_URL_REGEX: "^https?://[a-zA-Z0-9.-]+\\.svc\\.cluster\\.local(:[0-9]+)?(/.*)?$"
-      TARGET_BRANCH: main
+      SRC_BRANCH: main
 
     steps:
-      - name: Checkout Target Commit
+      - name: Checkout Source Branch
         uses: actions/checkout@v4
       
       - name: Set Check Status to Pending
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           sha: ${{ github.event.sha || github.sha }}
           status: pending
           context: 'Auto Smoke Test'
@@ -67,7 +68,7 @@ jobs:
         run: |
           echo "Smoke test URL: $TARGET_URL"
 
-          HTTP_CODE=$(curl --proto '=http,https' --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$TARGET_URL") || true
+          HTTP_CODE=$(curl --proto '=http,https' --max-time 10 --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$TARGET_URL") || true
           echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
 
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
@@ -104,10 +105,10 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const targetBranch = process.env.TARGET_BRANCH;
+            const srcBranch = process.env.SRC_BRANCH;
             
             const { data: prs } = await github.rest.pulls.list({
-              owner, repo, head: `${owner}:${targetBranch}`, state: 'open', per_page: 1
+              owner, repo, head: `${owner}:${srcBranch}`, state: 'open', per_page: 1
             });
             if (prs.length === 0) return core.info("No open PR found.");
             
@@ -115,16 +116,19 @@ jobs:
             const isSmokeEnabled = process.env.SMOKE_ENABLED === 'true';
             const configError = process.env.SMOKE_CONFIG_ERROR;
             const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
-            const isSmokeFailed = isSmokeEnabled && (configError || isNaN(httpCode) || httpCode >= 400);
+            const isSmokeFailed = isSmokeEnabled && !!(configError || isNaN(httpCode) || httpCode >= 400);
             const shouldMarkReady = pr.draft && !isSmokeFailed;
 
-            core.setOutput('smoke_failed', isSmokeFailed ? 'true' : 'false');
+            core.setOutput('smoke_failed', isSmokeFailed);
             
             // Construct the comment content
             const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
             const lines = [marker];
             
-            if (isSmokeFailed) {
+            if (!isSmokeEnabled) {
+              lines.push("### ⚪ Smoke Test: SKIPPED");
+              lines.push("Smoke test is disabled in `.github/smoke_test.json`.");
+            } else if (isSmokeFailed) {
               lines.push("### 🔴 Smoke Test: FAILED");
               lines.push("The PR will remain in Draft status until the endpoint is reachable.");
             } else {
@@ -188,8 +192,8 @@ jobs:
         if: always()
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           sha: ${{ github.event.sha || github.sha }}
-          status: ${{ steps.process_pr.outputs.smoke_failed == 'true' && 'failure' || 'success' }}
+          status: ${{ steps.process_pr.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
           context: 'Auto Smoke Test'
-          description: ${{ steps.process_pr.outputs.smoke_failed == 'true' && 'Smoke Test failed' || 'Smoke Test passed' }}
+          description: ${{ steps.process_pr.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
