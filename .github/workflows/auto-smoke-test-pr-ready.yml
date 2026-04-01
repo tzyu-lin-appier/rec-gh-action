@@ -36,14 +36,14 @@ jobs:
             exit 0
           fi
           
-          # URL=$(jq -r '.url // ""' "$CONFIG_FILE")
-          # if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
-          #   echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
-          #   echo "enabled=true" >> $GITHUB_OUTPUT
-          #   echo "error=URL_REJECTED" >> $GITHUB_OUTPUT
-          #   echo "url=$URL" >> $GITHUB_OUTPUT
-          #   exit 0
-          # fi
+          URL=$(jq -r '.url // ""' "$CONFIG_FILE")
+          if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
+            echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
+            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "error=URL_REJECTED" >> $GITHUB_OUTPUT
+            echo "url=$URL" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
           LINES=$(jq -r '.preview_lines // 15' "$CONFIG_FILE")
           if ! [[ "$LINES" =~ ^[0-9]+$ ]]; then
