@@ -9,7 +9,7 @@ jobs:
     permissions:
       pull-requests: write
       issues: write
-      contents: read
+      contents: write
     env:
       ALLOWED_URL_REGEX: "^https?://[a-zA-Z0-9.-]+\\.svc\\.cluster\\.local(:[0-9]+)?(/.*)?$"
 
