@@ -120,6 +120,7 @@ jobs:
 
             core.setOutput('smoke_failed', isSmokeFailed);
             
+            
             // Construct the comment content
             const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
             const lines = [marker];
@@ -183,6 +184,14 @@ jobs:
               `, { id: pr.node_id });
               core.info(`PR #${pr.number} marked as ready.`);
             }
+
+      - name: Debug Process PR Outputs
+        if: always()
+        run: |
+          echo "==== 變數大公開 ===="
+          echo "smoke_failed 的值是: '${{ steps.process_pr.outputs.smoke_failed }}'"
+          echo "全部的 outputs 內容: ${{ toJSON(steps.process_pr.outputs) }}"
+          echo "===================="
 
       - name: Set Final Check Status
         if: always()
