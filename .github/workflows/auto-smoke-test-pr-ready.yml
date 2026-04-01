@@ -23,11 +23,11 @@ jobs:
             const automatedBranch = 'main';
             core.setOutput('branch', automatedBranch);
             core.info(`Target branch: ${automatedBranch}`);
-            
+
       - name: Checkout target commit
         uses: actions/checkout@v4
       
-      - name: 🟡 Set Check to Pending
+      - name: Set Check to Pending
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -101,6 +101,7 @@ jobs:
           fi
 
       - name: Process PR (Comment & Ready) via GitHub Script
+        id: process_pr
         uses: actions/github-script@v7
         env:
           BRANCH_NAME: ${{ steps.check_branch.outputs.branch }}
@@ -125,6 +126,8 @@ jobs:
             const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
             const isSmokeFailed = isSmokeEnabled && (smokeError || isNaN(httpCode) || httpCode >= 400);
             const shouldMarkReady = pr.draft && !isSmokeFailed;
+
+            core.setOutput('is_smoke_failed', isSmokeFailed);
             
             // Construct the comment content
             const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
@@ -189,3 +192,13 @@ jobs:
               `, { id: pr.node_id });
               core.info(`PR #${pr.number} marked as ready.`);
             }
+
+      - name: Set Final Check Status
+        if: always()
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          sha: ${{ github.event.sha || github.sha }}
+          status: ${{ steps.process_pr.outputs.is_smoke_failed == 'true' && 'failure' || 'success' }}
+          context: 'Auto Smoke Test'
+          description: ${{ steps.process_pr.outputs.is_smoke_failed == 'true' && 'Smoke Test failed.' || 'Smoke Test passed!' }}
