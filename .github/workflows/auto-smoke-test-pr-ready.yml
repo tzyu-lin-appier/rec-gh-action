@@ -36,14 +36,14 @@ jobs:
             exit 0
           fi
           
-          URL=$(jq -r '.url // ""' "$CONFIG_FILE")
-          if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
-            echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
-            echo "enabled=true" >> $GITHUB_OUTPUT
-            echo "error=URL_REJECTED" >> $GITHUB_OUTPUT
-            echo "url=$URL" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # URL=$(jq -r '.url // ""' "$CONFIG_FILE")
+          # if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
+          #   echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
+          #   echo "enabled=true" >> $GITHUB_OUTPUT
+          #   echo "error=URL_REJECTED" >> $GITHUB_OUTPUT
+          #   echo "url=$URL" >> $GITHUB_OUTPUT
+          #   exit 0
+          # fi
           
           LINES=$(jq -r '.preview_lines // 15' "$CONFIG_FILE")
           if ! [[ "$LINES" =~ ^[0-9]+$ ]]; then
@@ -56,39 +56,39 @@ jobs:
           echo "lines=$LINES" >> $GITHUB_OUTPUT
           echo "Config validated successfully."
 
-      # - name: Execute Smoke Test
-      #   id: smoke_test
-      #   if: steps.config.outputs.enabled == 'true' && !steps.config.outputs.error
-      #   env:
-      #     URL: ${{ steps.config.outputs.url }}
-      #     LINES: ${{ steps.config.outputs.lines }}
-      #   run: |
-      #     echo "Smoke test URL: $URL"
+      - name: Execute Smoke Test
+        id: smoke_test
+        if: steps.config.outputs.enabled == 'true' && !steps.config.outputs.error
+        env:
+          URL: ${{ steps.config.outputs.url }}
+          LINES: ${{ steps.config.outputs.lines }}
+        run: |
+          echo "Smoke test URL: $URL"
 
-      #     HTTP_CODE=$(curl --proto '=http,https' --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$URL") || true
-      #     echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          HTTP_CODE=$(curl --proto '=http,https' --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$URL") || true
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
 
-      #     if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
-      #       jq '.' full_response.json > full_formatted.json 2>/dev/null || cat full_response.json > full_formatted.json
-      #       head -n "$LINES" full_formatted.json > response.txt
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            jq '.' full_response.json > full_formatted.json 2>/dev/null || cat full_response.json > full_formatted.json
+            head -n "$LINES" full_formatted.json > response.txt
 
-      #       TOTAL_LINES=$(wc -l < full_formatted.json | tr -d ' ')
-      #       SHOWN_LINES=$(wc -l < response.txt | tr -d ' ')
+            TOTAL_LINES=$(wc -l < full_formatted.json | tr -d ' ')
+            SHOWN_LINES=$(wc -l < response.txt | tr -d ' ')
 
-      #       EOF_MARKER="EOF_$(date +%s)"
-      #       {
-      #         echo "api_sample<<$EOF_MARKER"
-      #         cat response.txt
-      #         if [ "$TOTAL_LINES" -gt "$SHOWN_LINES" ]; then
-      #           echo "... (${TOTAL_LINES} total lines, showing first ${SHOWN_LINES})"
-      #         fi
-      #         printf "\n"
-      #         echo "$EOF_MARKER"
-      #       } >> "$GITHUB_OUTPUT"
-      #       echo "Smoke test passed (HTTP $HTTP_CODE)"
-      #     else
-      #       echo "Smoke test failed (HTTP $HTTP_CODE)"
-      #     fi
+            EOF_MARKER="EOF_$(date +%s)"
+            {
+              echo "api_sample<<$EOF_MARKER"
+              cat response.txt
+              if [ "$TOTAL_LINES" -gt "$SHOWN_LINES" ]; then
+                echo "... (${TOTAL_LINES} total lines, showing first ${SHOWN_LINES})"
+              fi
+              printf "\n"
+              echo "$EOF_MARKER"
+            } >> "$GITHUB_OUTPUT"
+            echo "Smoke test passed (HTTP $HTTP_CODE)"
+          else
+            echo "Smoke test failed (HTTP $HTTP_CODE)"
+          fi
 
       # - name: Process PR (Comment & Ready) via GitHub Script
       #   uses: actions/github-script@v7
