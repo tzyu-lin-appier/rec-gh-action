@@ -1,5 +1,5 @@
 {
   "enabled": true,
-  "url": "http://datafeed-v2-product-api-dev.datafeed.svc.cluster.local:10001/v2/datafeeds/android--com.coupang.mobile_s2s/available-predefined-list",
+  "url": "https://datafeed-product-api-stg.appier.co/v2/datafeeds/android--com.coupang.mobile_s2s/available-predefined-list",
   "preview_lines": 100
 }

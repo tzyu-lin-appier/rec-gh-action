@@ -14,6 +14,15 @@ jobs:
       ALLOWED_URL_REGEX: "^https?://[a-zA-Z0-9.-]+\\.svc\\.cluster\\.local(:[0-9]+)?(/.*)?$"
 
     steps:
+      - name: Extract automated branch name
+        id: check_branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const automatedBranch = 'main';
+            core.setOutput('branch', automatedBranch);
+            core.info(`Target branch: ${automatedBranch}`);
+            
       - name: Checkout target commit
         uses: actions/checkout@v4
 
@@ -21,7 +30,6 @@ jobs:
         id: config
         run: |
           CONFIG_FILE=".github/smoke_test.json"
-          cat $CONFIG_FILE
           if [ ! -f "$CONFIG_FILE" ] || [ "$(jq -r '.enabled // false' "$CONFIG_FILE")" != "true" ]; then
             echo "enabled=false" >> $GITHUB_OUTPUT
             echo "Smoke test disabled or config not found."
