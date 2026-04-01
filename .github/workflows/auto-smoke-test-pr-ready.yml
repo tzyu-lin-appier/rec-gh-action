@@ -104,8 +104,7 @@ jobs:
               owner, repo, head: `${owner}:${srcBranch}`, state: 'open', per_page: 1
             });
             if (prs.length > 0) {
-              core.setOutput('pr_number', prs[0].number);
-              core.info(`Found PR #${prs[0].number} for branch ${srcBranch}`);
+              core.setOutput('number', prs[0].number);
             }
 
       - name: Prepare Comment Body
