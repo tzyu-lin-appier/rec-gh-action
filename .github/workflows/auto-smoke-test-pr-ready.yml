@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: 🟡 Set Check to Pending
-        uses: myrotvorets/set-commit-status-action@3730c0a
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           sha: ${{ github.event.sha }}
