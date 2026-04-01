@@ -162,7 +162,7 @@ jobs:
         with:
           number: ${{ steps.find_pr.outputs.number }}
           header: auto-smoke-test-report
-          message: ${{ steps.process_pr.outputs.comment_body }}
+          message: ${{ steps.prepare_body.outputs.comment_body }}
 
       - name: Set Final Check Status
         if: always()
@@ -170,6 +170,6 @@ jobs:
         with:
           token: ${{ github.token }}
           sha: ${{ github.event.sha || github.sha }}
-          status: ${{ steps.process_pr.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
+          status: ${{ steps.prepare_body.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
           context: 'Auto Smoke Test'
-          description: ${{ steps.process_pr.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
+          description: ${{ steps.prepare_body.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
