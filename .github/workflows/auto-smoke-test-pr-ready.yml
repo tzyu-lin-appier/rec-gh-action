@@ -105,6 +105,7 @@ jobs:
             });
             if (prs.length > 0) {
               core.setOutput('pr_number', prs[0].number);
+              core.info(`Found PR #${prs[0].number} for branch ${srcBranch}`);
             }
 
       - name: Prepare Comment Body
