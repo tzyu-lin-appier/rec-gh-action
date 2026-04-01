@@ -5,60 +5,60 @@ on:
 
 jobs:
   register-and-check:
-  runs-on: ubuntu-latest
-  outputs:
-    branch_found: ${{ steps.extract_branch.outputs.branch_found }}
-    branch_name: ${{ steps.extract_branch.outputs.branch }}
-  permissions:
+    runs-on: ubuntu-latest
+    outputs:
+      branch_found: ${{ steps.extract_branch.outputs.branch_found }}
+      branch_name: ${{ steps.extract_branch.outputs.branch }}
+    permissions:
       statuses: write
-  
-  steps:
-    - name: Set Check Status to Pending
-      uses: myrotvorets/set-commit-status-action@v2.0.1
-      with:
-        token: ${{ github.token }}
-        sha: ${{ github.event.sha || github.sha }}
-        status: pending
-        context: 'Auto Smoke Test'
-        description: 'Smoke Test is running...'
+    
+    steps:
+      - name: Set Check Status to Pending
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          token: ${{ github.token }}
+          sha: ${{ github.event.sha || github.sha }}
+          status: pending
+          context: 'Auto Smoke Test'
+          description: 'Smoke Test is running...'
 
-    - name: Extract Branch
-      id: extract_branch
-      uses: actions/github-script@v7
-      env:
-        BRANCH_PREFIX: "automated/"
-      with:
-        script: |
-          const branchPrefix = process.env.BRANCH_PREFIX;
-          const branches = context.payload.branches || [];
-          const target = branches.find(b => b.name.startsWith(branchPrefix));
-          if (target) {
-            core.setOutput('branch_found', 'true');
-            core.setOutput('branch', target.name);
-          } else {
-            core.setOutput('branch_found', 'false');
-          }
+      - name: Extract Branch
+        id: extract_branch
+        uses: actions/github-script@v7
+        env:
+          BRANCH_PREFIX: "automated/"
+        with:
+          script: |
+            const branchPrefix = process.env.BRANCH_PREFIX;
+            const branches = context.payload.branches || [];
+            const target = branches.find(b => b.name.startsWith(branchPrefix));
+            if (target) {
+              core.setOutput('branch_found', 'true');
+              core.setOutput('branch', target.name);
+            } else {
+              core.setOutput('branch_found', 'false');
+            }
 
-    - name: Set Check Status (Exit Early)
-      if: steps.extract_branch.outputs.branch_found == 'false'
-      uses: myrotvorets/set-commit-status-action@v2.0.1
-      with:
-        token: ${{ github.token }}
-        sha: ${{ github.event.sha || github.sha }}
-        status: success
-        context: 'Auto Smoke Test'
-        description: 'Skipped: No automated/ branch detected.'
+      - name: Set Check Status (Exit Early)
+        if: steps.extract_branch.outputs.branch_found == 'false'
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          token: ${{ github.token }}
+          sha: ${{ github.event.sha || github.sha }}
+          status: success
+          context: 'Auto Smoke Test'
+          description: 'Skipped: No automated/ branch detected.'
 
-    - name: Set Check Status (Unexpected Failure)
-      if: failure()
-      uses: myrotvorets/set-commit-status-action@v2.0.1
-      with:
-        token: ${{ github.token }}
-        sha: ${{ github.event.sha || github.sha }}
-        status: failure
-        context: 'Auto Smoke Test'
-        description: 'Workflow Error: Failed to extract branch information.'
-        
+      - name: Set Check Status (Unexpected Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          token: ${{ github.token }}
+          sha: ${{ github.event.sha || github.sha }}
+          status: failure
+          context: 'Auto Smoke Test'
+          description: 'Workflow Error: Failed to extract branch information.'
+          
   smoke-test:
     needs: register-and-check
     if: needs.register-and-check.outputs.branch_found == 'true'
@@ -83,7 +83,7 @@ jobs:
           CONFIG_FILE: ".github/smoke_test.json"
         run: |
           if [ ! -f "$CONFIG_FILE" ] || [ "$(jq -r '.enabled // false' "$CONFIG_FILE")" != "true" ]; then
-            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Smoke test disabled or config not found."
             exit 0
           fi
@@ -91,9 +91,9 @@ jobs:
           URL=$(jq -r '.url // ""'   "$CONFIG_FILE")
           if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
             echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
-            echo "enabled=true" >> $GITHUB_OUTPUT
-            echo "config_error=URL_REJECTED" >> $GITHUB_OUTPUT
-            echo "url=$URL" >> $GITHUB_OUTPUT
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "config_error=URL_REJECTED" >> "$GITHUB_OUTPUT"
+            echo "url=$URL" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           
@@ -103,9 +103,9 @@ jobs:
             LINES=15
           fi
           
-          echo "enabled=true" >> $GITHUB_OUTPUT
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "preview_lines=$LINES" >> $GITHUB_OUTPUT
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "preview_lines=$LINES" >> "$GITHUB_OUTPUT"
           echo "Config validated successfully."
 
       - name: Execute Smoke Test
@@ -119,7 +119,7 @@ jobs:
 
           HTTP_CODE=$(curl --proto '=http,https' --max-time 10 --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$TARGET_URL") || true
           HTTP_CODE=${HTTP_CODE:-000}
-          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "http_code=$HTTP_CODE" >> "$GITHUB_OUTPUT"
 
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
             jq '.' full_response.json > full_formatted.json 2>/dev/null || cp full_response.json full_formatted.json
@@ -137,7 +137,7 @@ jobs:
               if [ "$TOTAL_LINES" -gt "$SHOWN_LINES" ]; then
                 echo "... (${TOTAL_LINES} total lines, showing first ${SHOWN_LINES})"
               fi
-              echo "" # 確保在 EOF_MARKER 之前有斷行
+              echo ""
               echo "$EOF_MARKER"
             } >> "$GITHUB_OUTPUT"
 
@@ -151,7 +151,7 @@ jobs:
         env:
           SMOKE_ENABLED: ${{ steps.config.outputs.enabled }}
           SMOKE_URL: ${{ steps.config.outputs.url }}
-          SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }} || 000
+          SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }}
           SMOKE_CONFIG_ERROR: ${{ steps.config.outputs.config_error }}
           SMOKE_RESPONSE_SAMPLE: ${{ steps.smoke_test.outputs.api_sample }}
         run: |
@@ -161,10 +161,11 @@ jobs:
               IS_FAILED="true"
             fi
           fi
-          echo "smoke_failed=$IS_FAILED" >> $GITHUB_OUTPUT
+          echo "smoke_failed=$IS_FAILED" >> "$GITHUB_OUTPUT"
 
+          EOF_MARKER="EOF_$(date +%s)"
           { 
-            echo "comment_body<<EOF"
+            echo "comment_body<<$EOF_MARKER"
             if [ "$SMOKE_ENABLED" != "true" ]; then
               echo "### ⚪ Smoke Test: SKIPPED"
               echo "Smoke test is disabled in \`.github/smoke_test.json\`."
@@ -190,14 +191,14 @@ jobs:
                 echo "</details>"
               fi
             fi
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+            echo "$EOF_MARKER"
+          } >> "$GITHUB_OUTPUT"
       
       - name: Find Pull Request Number
         id: find_pr
         uses: actions/github-script@v7
         env:
-          SRC_BRANCH: ${{ needs.register-and-check.outputs.branch }}
+          SRC_BRANCH: ${{ needs.register-and-check.outputs.branch_name }}
         with:
           script: |
             const { owner, repo } = context.repo;
