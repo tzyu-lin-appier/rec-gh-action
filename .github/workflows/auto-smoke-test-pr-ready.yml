@@ -4,34 +4,84 @@ on:
   workflow_dispatch:
 
 jobs:
-  auto-smoke-test:
+  register-and-check:
+  runs-on: ubuntu-latest
+  outputs:
+    branch_found: ${{ steps.extract_branch.outputs.branch_found }}
+    branch_name: ${{ steps.extract_branch.outputs.branch }}
+  permissions:
+      statuses: write
+  
+  steps:
+    - name: Set Check Status to Pending
+      uses: myrotvorets/set-commit-status-action@v2.0.1
+      with:
+        token: ${{ github.token }}
+        sha: ${{ github.event.sha || github.sha }}
+        status: pending
+        context: 'Auto Smoke Test'
+        description: 'Smoke Test is running...'
+
+    - name: Extract Branch
+      id: extract_branch
+      uses: actions/github-script@v7
+      env:
+        BRANCH_PREFIX: "automated/"
+      with:
+        script: |
+          const branchPrefix = process.env.BRANCH_PREFIX;
+          const branches = context.payload.branches || [];
+          const target = branches.find(b => b.name.startsWith(branchPrefix));
+          if (target) {
+            core.setOutput('branch_found', 'true');
+            core.setOutput('branch', target.name);
+          } else {
+            core.setOutput('branch_found', 'false');
+          }
+
+    - name: Set Check Status (Exit Early)
+      if: steps.extract_branch.outputs.branch_found == 'false'
+      uses: myrotvorets/set-commit-status-action@v2.0.1
+      with:
+        token: ${{ github.token }}
+        sha: ${{ github.event.sha || github.sha }}
+        status: success
+        context: 'Auto Smoke Test'
+        description: 'Skipped: No automated/ branch detected.'
+
+    - name: Set Check Status (Unexpected Failure)
+      if: failure()
+      uses: myrotvorets/set-commit-status-action@v2.0.1
+      with:
+        token: ${{ github.token }}
+        sha: ${{ github.event.sha || github.sha }}
+        status: failure
+        context: 'Auto Smoke Test'
+        description: 'Workflow Error: Failed to extract branch information.'
+        
+  smoke-test:
+    needs: register-and-check
+    if: needs.register-and-check.outputs.branch_found == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       statuses: write
-      pull-requests: write
+      pull-requests: write  
       contents: read
     env:
       ALLOWED_URL_REGEX: "^https?://[a-zA-Z0-9.-]+\\.svc\\.cluster\\.local(:[0-9]+)?(/.*)?$"
-      SRC_BRANCH: main
 
     steps:
-      - name: Set Check Status to Pending
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        with:
-          token: ${{ github.token }}
-          sha: ${{ github.event.sha || github.sha }}
-          status: pending
-          context: 'Auto Smoke Test'
-          description: 'Smoke Test is running...'
-
       - name: Checkout Source Branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.sha || github.sha }}
 
       - name: Validate Smoke Test Config
         id: config
+        env:
+          CONFIG_FILE: ".github/smoke_test.json"
         run: |
-          CONFIG_FILE=".github/smoke_test.json"
           if [ ! -f "$CONFIG_FILE" ] || [ "$(jq -r '.enabled // false' "$CONFIG_FILE")" != "true" ]; then
             echo "enabled=false" >> $GITHUB_OUTPUT
             echo "Smoke test disabled or config not found."
@@ -68,25 +118,29 @@ jobs:
           echo "Smoke test URL: $TARGET_URL"
 
           HTTP_CODE=$(curl --proto '=http,https' --max-time 10 --retry 5 --retry-delay 5 --retry-all-errors -s -o full_response.json -w "%{http_code}" "$TARGET_URL") || true
+          HTTP_CODE=${HTTP_CODE:-000}
           echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
 
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
-            jq '.' full_response.json > full_formatted.json 2>/dev/null || cat full_response.json > full_formatted.json
+            jq '.' full_response.json > full_formatted.json 2>/dev/null || cp full_response.json full_formatted.json
+            
             head -n "$PREVIEW_LINES" full_formatted.json > response.txt
 
             TOTAL_LINES=$(wc -l < full_formatted.json | tr -d ' ')
             SHOWN_LINES=$(wc -l < response.txt | tr -d ' ')
 
             EOF_MARKER="EOF_$(date +%s)"
+            
             {
               echo "api_sample<<$EOF_MARKER"
               cat response.txt
               if [ "$TOTAL_LINES" -gt "$SHOWN_LINES" ]; then
                 echo "... (${TOTAL_LINES} total lines, showing first ${SHOWN_LINES})"
               fi
-              printf "\n"
+              echo "" # 確保在 EOF_MARKER 之前有斷行
               echo "$EOF_MARKER"
             } >> "$GITHUB_OUTPUT"
+
             echo "Smoke test passed (HTTP $HTTP_CODE)"
           else
             echo "Smoke test failed (HTTP $HTTP_CODE)"
@@ -97,13 +151,13 @@ jobs:
         env:
           SMOKE_ENABLED: ${{ steps.config.outputs.enabled }}
           SMOKE_URL: ${{ steps.config.outputs.url }}
-          SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }}
+          SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }} || 000
           SMOKE_CONFIG_ERROR: ${{ steps.config.outputs.config_error }}
           SMOKE_RESPONSE_SAMPLE: ${{ steps.smoke_test.outputs.api_sample }}
         run: |
           IS_FAILED="false"
           if [ "$SMOKE_ENABLED" = "true" ]; then
-            if [ -n "$SMOKE_CONFIG_ERROR" ] || [ -z "$SMOKE_HTTP_CODE" ] || [ "$SMOKE_HTTP_CODE" -ge 400 ]; then
+            if [ -n "$SMOKE_CONFIG_ERROR" ] || [ "$SMOKE_HTTP_CODE" -lt 200 ] || [ "$SMOKE_HTTP_CODE" -ge 400 ]; then
               IS_FAILED="true"
             fi
           fi
@@ -142,6 +196,8 @@ jobs:
       - name: Find Pull Request Number
         id: find_pr
         uses: actions/github-script@v7
+        env:
+          SRC_BRANCH: ${{ needs.register-and-check.outputs.branch }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -169,6 +225,6 @@ jobs:
         with:
           token: ${{ github.token }}
           sha: ${{ github.event.sha || github.sha }}
-          status: ${{ steps.prepare_body.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
+          status: ${{steps.prepare_body.outputs.smoke_failed == 'false' && 'success' || 'failure' }}
           context: 'Auto Smoke Test'
-          description: ${{ steps.prepare_body.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
+          description: ${{steps.prepare_body.outputs.smoke_failed == 'false' && 'Smoke Test passed' || 'Smoke Test failed' }}
