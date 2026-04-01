@@ -109,7 +109,6 @@ jobs:
             const configError = process.env.SMOKE_CONFIG_ERROR;
             const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
             const isSmokeFailed = isSmokeEnabled && !!(configError || isNaN(httpCode) || httpCode >= 400);
-            const shouldMarkReady = pr.draft && isSmokeEnabled && !isSmokeFailed;
 
             core.setOutput('smoke_failed', String(isSmokeFailed));
             
@@ -118,7 +117,9 @@ jobs:
               owner, repo, head: `${owner}:${srcBranch}`, state: 'open', per_page: 1
             });
             if (prs.length === 0) return core.info("No open PR found.");
+
             const pr = prs[0];
+            const shouldMarkReady = pr.draft && isSmokeEnabled && !isSmokeFailed;
             
             // Construct the comment content
             const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
