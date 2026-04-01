@@ -158,16 +158,16 @@ jobs:
             const existingComment = comments.find(c => c.body.includes(marker));
             
             if (existingComment) {
-              await github.rest.issues.updateComment({
-                owner, repo, comment_id: existingComment.id, body: bodyContent
+              await github.rest.issues.deleteComment({
+                owner, repo, comment_id: existingComment.id
               });
-              core.info("Updated existing smoke test comment.");
-            } else {
-              await github.rest.issues.createComment({
-                owner, repo, issue_number: pr.number, body: bodyContent
-              });
-              core.info("Created new smoke test comment.");
+              core.info("Deleted old smoke test comment.");
             }
+            
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr.number, body: bodyContent
+            });
+            core.info("Created new smoke test comment at the bottom of the PR.");
             
             if (shouldMarkReady) {
               await github.graphql(`
