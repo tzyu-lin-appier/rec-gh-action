@@ -115,38 +115,59 @@ jobs:
             const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
             const isSmokeFailed = isSmokeEnabled && (smokeError || isNaN(httpCode) || httpCode >= 400);
             const shouldMarkReady = pr.draft && !isSmokeFailed;
-            const smokeStatus = isSmokeFailed ? "FAILED" : "PASSED";
             
-            // build up comment content
-            const lines = [
-              `CI checks passed for branch: ${branch}`,
-              ""
-            ];
+            // Construct the comment content
+            const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
+            const lines = [marker];
             
             if (isSmokeFailed) {
-              lines.push("Smoke Test Failed: The PR will remain in Draft status until the endpoint is reachable.");
-            } else if (shouldMarkReady) {
-              lines.push("This PR has been automatically marked as ready for review.");
+              lines.push("### 🔴 Smoke Test: FAILED");
+              lines.push("The PR will remain in Draft status until the endpoint is reachable.");
+            } else {
+              lines.push("### 🟢 Smoke Test: PASSED");
+              if (shouldMarkReady) {
+                lines.push("This PR has been automatically marked as ready for review.");
+              }
             }
+    
             lines.push("");
             
             if (isSmokeEnabled) {
-              lines.push("### Smoke Test Details");
-              lines.push(`- URL: ${process.env.SMOKE_URL}`);
+              lines.push(`- **URL:** [${process.env.SMOKE_URL}](${process.env.SMOKE_URL})`);
               const statusDetail = smokeError || process.env.SMOKE_HTTP_CODE || 'N/A';
-              lines.push(`- Status: ${statusDetail} (${smokeStatus})`);
+              lines.push(`- **HTTP Status:** ${statusDetail}`);
             
               if (process.env.SMOKE_SAMPLE) {
-                lines.push("", "<details><summary>Click to expand API Response</summary>", "");
-                lines.push("```json", process.env.SMOKE_SAMPLE, "```", "");
+                lines.push("");
+                lines.push("<details><summary>Click to expand API Response</summary>");
+                lines.push("");
+                lines.push("```json");
+                lines.push(process.env.SMOKE_SAMPLE);
+                lines.push("```");
+                lines.push("");
                 lines.push("</details>");
               }
             }
             
-            // execute comment and PR update
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: pr.number, body: lines.join('\n')
+            const bodyContent = lines.join('\n');
+            
+            // Find the previous comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number: pr.number
             });
+            const existingComment = comments.find(c => c.body.includes(marker));
+            
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existingComment.id, body: bodyContent
+              });
+              core.info("Updated existing smoke test comment.");
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number, body: bodyContent
+              });
+              core.info("Created new smoke test comment.");
+            }
             
             if (shouldMarkReady) {
               await github.graphql(`
