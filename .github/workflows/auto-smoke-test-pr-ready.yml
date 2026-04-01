@@ -26,11 +26,11 @@ jobs:
         id: extract_branch
         uses: actions/github-script@v7
         env:
-          BRANCH_PREFIX: "automated/"
+          BRANCH_PREFIX: "main/"
         with:
           script: |
             const branchPrefix = process.env.BRANCH_PREFIX;
-            const branches = context.payload.branches || [];
+            const branches = context.payload.branches || ["main"];
             const target = branches.find(b => b.name.startsWith(branchPrefix));
             if (target) {
               core.setOutput('branch_found', 'true');
