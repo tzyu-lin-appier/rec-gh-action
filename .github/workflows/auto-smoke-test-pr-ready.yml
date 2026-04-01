@@ -118,6 +118,7 @@ jobs:
               owner, repo, head: `${owner}:${srcBranch}`, state: 'open', per_page: 1
             });
             if (prs.length === 0) return core.info("No open PR found.");
+            const pr = prs[0];
             
             // Construct the comment content
             const marker = "<!-- SMOKE_TEST_COMMENT_MARKER -->";
