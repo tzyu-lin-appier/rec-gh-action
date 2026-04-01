@@ -30,7 +30,7 @@ jobs:
         with:
           script: |
             const branchPrefix = process.env.BRANCH_PREFIX;
-            const branches = context.payload.branches || ["main"];
+            const branches = ["main"];
             const target = branches.find(b => b.name.startsWith(branchPrefix));
             if (target) {
               core.setOutput('branch_found', 'true');
