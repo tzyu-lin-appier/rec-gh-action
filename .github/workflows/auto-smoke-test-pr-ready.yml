@@ -7,6 +7,7 @@ jobs:
   auto-ready-pr:
     runs-on: ubuntu-latest
     permissions:
+      statuses: write
       pull-requests: write
       issues: write
       contents: write
