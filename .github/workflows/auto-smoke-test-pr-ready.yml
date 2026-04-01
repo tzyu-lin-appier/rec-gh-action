@@ -36,7 +36,7 @@ jobs:
             exit 0
           fi
           
-          URL=$(jq -r '.url // ""' "$CONFIG_FILE")
+          URL=$(jq -r '.url // ""'   "$CONFIG_FILE")
           # if [[ ! "$URL" =~ $ALLOWED_URL_REGEX ]]; then
           #   echo "Security Error: Target URL ($URL) does not match the allowed internal domains."
           #   echo "enabled=true" >> $GITHUB_OUTPUT

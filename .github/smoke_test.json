@@ -1,5 +1,5 @@
 {
   "enabled": true,
-  "url": "https://datafeed-product-api-stg.appier.co/v2/datafeeds/android--com.coupang.mobile_s2s/available-predefined-list",
+  "url": "https://dync6.c.appier.net/w/watsons.com.tw/mimic-preview",
   "preview_lines": 100
 }
