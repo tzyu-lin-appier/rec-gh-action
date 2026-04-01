@@ -47,7 +47,7 @@ jobs:
           sha: ${{ github.event.sha || github.sha }}
           status: success
           context: 'Auto Smoke Test'
-          description: 'Skipped: No automated/ branch detected.'
+          description: 'Skipped: No target branch detected.'
 
       - name: Set Check Status (Unexpected Failure)
         if: failure()
