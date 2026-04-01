@@ -19,9 +19,16 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const automatedBranch = 'main';
-            core.setOutput('branch', automatedBranch);
-            core.info(`Target branch: ${automatedBranch}`);
+            const branches = context.payload.branches || [];
+            const automatedBranch = branches.find(b => b.name.startsWith('main'));
+            
+            if (!automatedBranch) {
+              core.setFailed("Could not find a branch starting with 'main' in the payload.");
+              return;
+            }
+            
+            core.setOutput('branch', automatedBranch.name);
+            core.info(`Target branch: ${automatedBranch.name}`);
             
       - name: Checkout target commit
         uses: actions/checkout@v4
@@ -90,71 +97,71 @@ jobs:
             echo "Smoke test failed (HTTP $HTTP_CODE)"
           fi
 
-      # - name: Process PR (Comment & Ready) via GitHub Script
-      #   uses: actions/github-script@v7
-      #   env:
-      #     BRANCH_NAME: ${{ steps.check_branch.outputs.branch }}
-      #     SMOKE_ENABLED: ${{ steps.config.outputs.enabled }}
-      #     SMOKE_URL: ${{ steps.config.outputs.url }}
-      #     SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }}
-      #     SMOKE_ERROR: ${{ steps.config.outputs.error }}
-      #     SMOKE_SAMPLE: ${{ steps.smoke_test.outputs.api_sample }}
-      #   with:
-      #     script: |
-      #       const { owner, repo } = context.repo;
-      #       const branch = process.env.BRANCH_NAME;
+      - name: Process PR (Comment & Ready) via GitHub Script
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.check_branch.outputs.branch }}
+          SMOKE_ENABLED: ${{ steps.config.outputs.enabled }}
+          SMOKE_URL: ${{ steps.config.outputs.url }}
+          SMOKE_HTTP_CODE: ${{ steps.smoke_test.outputs.http_code }}
+          SMOKE_ERROR: ${{ steps.config.outputs.error }}
+          SMOKE_SAMPLE: ${{ steps.smoke_test.outputs.api_sample }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = process.env.BRANCH_NAME;
             
-      #       const { data: prs } = await github.rest.pulls.list({
-      #         owner, repo, head: `${owner}:${branch}`, state: 'open', per_page: 1
-      #       });
-      #       if (prs.length === 0) return core.info("No open PR found.");
+            const { data: prs } = await github.rest.pulls.list({
+              owner, repo, head: `${owner}:${branch}`, state: 'open', per_page: 1
+            });
+            if (prs.length === 0) return core.info("No open PR found.");
             
-      #       const pr = prs[0];
-      #       const isSmokeEnabled = process.env.SMOKE_ENABLED === 'true';
-      #       const smokeError = process.env.SMOKE_ERROR;
-      #       const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
-      #       const isSmokeFailed = isSmokeEnabled && (smokeError || isNaN(httpCode) || httpCode >= 400);
-      #       const shouldMarkReady = pr.draft && !isSmokeFailed;
-      #       const smokeStatus = isSmokeFailed ? "FAILED" : "PASSED";
+            const pr = prs[0];
+            const isSmokeEnabled = process.env.SMOKE_ENABLED === 'true';
+            const smokeError = process.env.SMOKE_ERROR;
+            const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
+            const isSmokeFailed = isSmokeEnabled && (smokeError || isNaN(httpCode) || httpCode >= 400);
+            const shouldMarkReady = pr.draft && !isSmokeFailed;
+            const smokeStatus = isSmokeFailed ? "FAILED" : "PASSED";
             
-      #       // build up comment content
-      #       const lines = [
-      #         `CI checks passed for branch: ${branch}`,
-      #         ""
-      #       ];
+            // build up comment content
+            const lines = [
+              `CI checks passed for branch: ${branch}`,
+              ""
+            ];
             
-      #       if (isSmokeFailed) {
-      #         lines.push("Smoke Test Failed: The PR will remain in Draft status until the endpoint is reachable.");
-      #       } else if (shouldMarkReady) {
-      #         lines.push("This PR has been automatically marked as ready for review.");
-      #       }
-      #       lines.push("");
+            if (isSmokeFailed) {
+              lines.push("Smoke Test Failed: The PR will remain in Draft status until the endpoint is reachable.");
+            } else if (shouldMarkReady) {
+              lines.push("This PR has been automatically marked as ready for review.");
+            }
+            lines.push("");
             
-      #       if (isSmokeEnabled) {
-      #         lines.push("### Smoke Test Details");
-      #         lines.push(`- URL: ${process.env.SMOKE_URL}`);
-      #         const statusDetail = smokeError || process.env.SMOKE_HTTP_CODE || 'N/A';
-      #         lines.push(`- Status: ${statusDetail} (${smokeStatus})`);
+            if (isSmokeEnabled) {
+              lines.push("### Smoke Test Details");
+              lines.push(`- URL: ${process.env.SMOKE_URL}`);
+              const statusDetail = smokeError || process.env.SMOKE_HTTP_CODE || 'N/A';
+              lines.push(`- Status: ${statusDetail} (${smokeStatus})`);
             
-      #         if (process.env.SMOKE_SAMPLE) {
-      #           lines.push("", "<details><summary>Click to expand API Response</summary>", "");
-      #           lines.push("```json", process.env.SMOKE_SAMPLE, "```", "");
-      #           lines.push("</details>");
-      #         }
-      #       }
+              if (process.env.SMOKE_SAMPLE) {
+                lines.push("", "<details><summary>Click to expand API Response</summary>", "");
+                lines.push("```json", process.env.SMOKE_SAMPLE, "```", "");
+                lines.push("</details>");
+              }
+            }
             
-      #       // execute comment and PR update
-      #       await github.rest.issues.createComment({
-      #         owner, repo, issue_number: pr.number, body: lines.join('\n')
-      #       });
+            // execute comment and PR update
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr.number, body: lines.join('\n')
+            });
             
-      #       if (shouldMarkReady) {
-      #         await github.graphql(`
-      #           mutation($id: ID!) {
-      #             markPullRequestReadyForReview(input: {pullRequestId: $id}) {
-      #               pullRequest { id }
-      #             }
-      #           }
-      #         `, { id: pr.node_id });
-      #         core.info(`PR #${pr.number} marked as ready.`);
-      #       }
+            if (shouldMarkReady) {
+              await github.graphql(`
+                mutation($id: ID!) {
+                  markPullRequestReadyForReview(input: {pullRequestId: $id}) {
+                    pullRequest { id }
+                  }
+                }
+              `, { id: pr.node_id });
+              core.info(`PR #${pr.number} marked as ready.`);
+            }
