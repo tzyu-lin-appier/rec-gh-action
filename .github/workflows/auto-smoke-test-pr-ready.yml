@@ -162,6 +162,8 @@ jobs:
         with:
           number: ${{ steps.find_pr.outputs.number }}
           header: auto-smoke-test-report
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
           message: ${{ steps.prepare_body.outputs.comment_body }}
 
       - name: Set Final Check Status
