@@ -109,7 +109,7 @@ jobs:
             const configError = process.env.SMOKE_CONFIG_ERROR;
             const httpCode = parseInt(process.env.SMOKE_HTTP_CODE, 10);
             const isSmokeFailed = isSmokeEnabled && !!(configError || isNaN(httpCode) || httpCode >= 400);
-            const shouldMarkReady = pr.draft && && isSmokeEnabled && !isSmokeFailed;
+            const shouldMarkReady = pr.draft && isSmokeEnabled && !isSmokeFailed;
 
             core.setOutput('smoke_failed', String(isSmokeFailed));
             
